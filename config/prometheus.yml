@@ -8,9 +8,8 @@ global:
     monitor: 'otel-lgtm'
     environment: '${ENVIRONMENT:-development}'
 
-# Remote write configuration for receiving from OTel Collector
-remote_write:
-  - url: http://prometheus:9090/api/v1/write
+# Note: Remote write receiver is enabled via command flag in docker-compose.yml
+# This allows Prometheus to receive metrics from the OTel Collector
 
 scrape_configs:
   # Self-monitoring

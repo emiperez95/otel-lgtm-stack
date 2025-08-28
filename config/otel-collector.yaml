@@ -119,7 +119,7 @@ service:
     metrics:
       receivers: [otlp, prometheus]
       processors: [memory_limiter, resource, batch]
-      exporters: [prometheusremotewrite, prometheus]
+      exporters: [prometheusremotewrite]
     
     # Logs pipeline
     logs:
@@ -139,3 +139,4 @@ service:
       encoding: console
     metrics:
       level: detailed
+      address: 0.0.0.0:8889
