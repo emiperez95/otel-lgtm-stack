@@ -1,0 +1,32 @@
+# Storage directories
+storage/
+*.db
+*.wal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+
+# Docker volumes
+data/
+volumes/
+
+# Temporary files
+*.tmp
+temp/
+tmp/

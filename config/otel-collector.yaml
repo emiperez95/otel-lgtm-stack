@@ -1,0 +1,171 @@
+# OpenTelemetry Collector Configuration
+# Generic configuration for receiving and exporting telemetry data
+
+receivers:
+  # OTLP Receiver - accepts data from any OpenTelemetry source
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+
+  # Prometheus receiver for scraping metrics (optional)
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8888']
+
+processors:
+  # Add resource attributes to all telemetry
+  resource:
+    attributes:
+      - key: environment
+        value: ${ENVIRONMENT:-development}
+        action: upsert
+      - key: collector.name
+        value: otel-lgtm
+        action: insert
+  
+  # Batch telemetry data for efficiency
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter prevents OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  # Filter processor (optional) - example of filtering by service
+  filter/errors:
+    error_mode: ignore
+    logs:
+      severity_texts:
+        - "DEBUG"
+        - "TRACE"
+
+exporters:
+  # Prometheus Remote Write for metrics
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    tls:
+      insecure: true
+    resource_to_telemetry_conversion:
+      enabled: true
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 1h
+
+  # Loki for logs
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: true
+      level: true
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 1h
+
+  # Tempo for traces
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 1h
+
+  # Debug exporter (disable in production)
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # Prometheus exporter for collector metrics
+  prometheus:
+    endpoint: "0.0.0.0:8888"
+    namespace: otelcol
+    enable_open_metrics: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+extensions:
+  # Health check endpoint
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/health"
+
+  # Performance profiling (disable in production)
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # zPages for debugging (disable in production)
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+  # File storage for persistent queue
+  file_storage:
+    directory: /var/lib/otel/storage
+    timeout: 10s
+    compaction:
+      on_start: true
+      on_rebound: true
+      directory: /var/lib/otel/storage
+
+service:
+  extensions: [health_check, pprof, zpages, file_storage]
+  
+  pipelines:
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheusremotewrite, prometheus]
+    
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki]
+    
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp/tempo]
+
+  telemetry:
+    logs:
+      level: ${LOG_LEVEL:-info}
+      encoding: console
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
