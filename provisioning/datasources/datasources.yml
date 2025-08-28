@@ -69,3 +69,15 @@ datasources:
             query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m]))'
           - name: 'Error rate'
             query: 'sum(rate(traces_spanmetrics_calls_total{status_code="ERROR",$$__tags}[5m]))'
+
+  # Pyroscope - Continuous Profiling
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    url: http://pyroscope:4040
+    uid: pyroscope
+    editable: true
+    jsonData:
+      profileTypeLabel: __profile_type__
+      levelLabel: level
+      minStep: 15s
