@@ -21,14 +21,14 @@ receivers:
         - job_name: 'otel-collector'
           scrape_interval: 10s
           static_configs:
-            - targets: ['localhost:8888']
+            - targets: ['localhost:8889']
 
 processors:
   # Add resource attributes to all telemetry
   resource:
     attributes:
       - key: environment
-        value: ${ENVIRONMENT:-development}
+        value: development
         action: upsert
       - key: collector.name
         value: otel-lgtm
@@ -46,13 +46,6 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 25
 
-  # Filter processor (optional) - example of filtering by service
-  filter/errors:
-    error_mode: ignore
-    logs:
-      severity_texts:
-        - "DEBUG"
-        - "TRACE"
 
 exporters:
   # Prometheus Remote Write for metrics
@@ -62,26 +55,17 @@ exporters:
       insecure: true
     resource_to_telemetry_conversion:
       enabled: true
-    sending_queue:
-      enabled: true
-      storage: file_storage
-      queue_size: 10000
     retry_on_failure:
       enabled: true
       initial_interval: 5s
       max_interval: 60s
       max_elapsed_time: 1h
 
-  # Loki for logs
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    default_labels_enabled:
-      exporter: true
-      level: true
-    sending_queue:
-      enabled: true
-      storage: file_storage
-      queue_size: 10000
+  # Loki for logs (via OTLP)
+  otlphttp/loki:
+    endpoint: http://loki:3100
+    tls:
+      insecure: true
     retry_on_failure:
       enabled: true
       initial_interval: 5s
@@ -93,10 +77,6 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-    sending_queue:
-      enabled: true
-      storage: file_storage
-      queue_size: 10000
     retry_on_failure:
       enabled: true
       initial_interval: 5s
@@ -111,7 +91,7 @@ exporters:
 
   # Prometheus exporter for collector metrics
   prometheus:
-    endpoint: "0.0.0.0:8888"
+    endpoint: "0.0.0.0:8889"
     namespace: otelcol
     enable_open_metrics: true
     resource_to_telemetry_conversion:
@@ -131,17 +111,8 @@ extensions:
   zpages:
     endpoint: 0.0.0.0:55679
 
-  # File storage for persistent queue
-  file_storage:
-    directory: /var/lib/otel/storage
-    timeout: 10s
-    compaction:
-      on_start: true
-      on_rebound: true
-      directory: /var/lib/otel/storage
-
 service:
-  extensions: [health_check, pprof, zpages, file_storage]
+  extensions: [health_check, pprof, zpages]
   
   pipelines:
     # Metrics pipeline
@@ -154,7 +125,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [loki]
+      exporters: [otlphttp/loki]
     
     # Traces pipeline
     traces:
@@ -164,8 +135,7 @@ service:
 
   telemetry:
     logs:
-      level: ${LOG_LEVEL:-info}
+      level: info
       encoding: console
     metrics:
       level: detailed
-      address: 0.0.0.0:8888

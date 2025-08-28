@@ -7,14 +7,14 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
-    command: ["--config=/etc/otel-collector.yaml"]
+    command: ["--config=/etc/otel-collector.yaml", "--set=service.telemetry.logs.level=${LOG_LEVEL:-info}"]
     volumes:
       - ./config/otel-collector.yaml:/etc/otel-collector.yaml:ro
       - ./storage/otel:/var/lib/otel/storage  # Persistent queue storage
     ports:
       - "${OTEL_GRPC_PORT:-4317}:4317"     # OTLP gRPC
       - "${OTEL_HTTP_PORT:-4318}:4318"     # OTLP HTTP
-      - "${OTEL_METRICS_PORT:-8888}:8888"  # Collector metrics
+      - "${OTEL_METRICS_PORT:-8889}:8889"  # Collector metrics
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - LOG_LEVEL=${LOG_LEVEL:-info}
